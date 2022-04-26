@@ -22,3 +22,6 @@ wfs_client <- WFSClient$new(wfs_tk,
 wfs_client$getFeatureTypes(pretty = TRUE)
 df <- wfs_client$getFeatureTypes(pretty = TRUE)
 df
+
+
+write.table(df, "datasets.csv", quote = F, row.names = F, dec = ",", sep = "\t", na = "")
