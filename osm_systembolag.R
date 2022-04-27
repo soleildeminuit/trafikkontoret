@@ -1,10 +1,21 @@
-library(dplyr)
-library(tibble)
-library(httr)
-library(jsonlite)
-library(osmdata)
-library(sf)
-library(tmap)
+# Nödvändiga paket
+for (package in c(
+  "dplyr", 
+  "tibble", 
+  "httr", 
+  "jsonlite", 
+  "osmdata", 
+  "sf", 
+  "areal",
+  "tmap", 
+  "viridis")) {
+  if (!require(package, character.only=T, quietly=T)) {
+    suppressPackageStartupMessages(package)
+    suppressWarnings(package)
+    install.packages(package)
+    library(package, character.only=T)
+  }
+}
 
 ################################## Systembolaget ##################################
 # Hämta alla systembolag inom Stockholms stads gränser från Systembolaget         #
@@ -19,14 +30,39 @@ library(tmap)
 ###################################################################################
 source("api_key_systembolaget.R")
 
-# Läs geodata (gränser) för stadsdelsnämndsområden, från Stockholms stads dataportal (öppna data)
-url_sdn <- "https://dataportalen.stockholm.se/dataportalen/Data/Stadsbyggnadskontoret/Stadsdelsnamndsomrade_2020.zip"
+# Metod 1: Läs geodata (gränser) för stadsdelsnämndsområden, från Stockholms stads dataportal (öppna data)
+url_dataportal <- "https://dataportalen.stockholm.se/dataportalen/Data/Stadsbyggnadskontoret/Stadsdelsnamndsomrade_2020.zip"
 f <- paste(getwd(), "/data/sdn.zip", sep = "")
-download.file(url_sdn, f, mode="wb")
+download.file(url_dataportal, f, mode="wb")
 unzip(f, exdir = "data")
 sdn <- st_read("data/Stadsdelsn„mndsomr†de_2020.shp") %>% 
   st_zm(drop = TRUE) %>% 
   st_transform(crs = 4326)
+
+# Metod 2: Hämta geodata för stadsdelsnämndsområden genom WebQuery-API (sbk)
+url_webquery <- "http://kartor.stockholm.se/bios/webquery/app/baggis/web/web_query?section="
+methods <- c("locate*stadsdelsnamnd", "stadsdelsnamnd*suggest")
+urlJ <- fromJSON(paste(url_webquery,
+                       methods[1],
+                       "&&resulttype=json",
+                       sep = ""))
+urlJ2 <- fromJSON(paste(url_webquery,
+                        methods[2],
+                        "&&resulttype=json",
+                        sep = ""))
+
+sfc <- st_as_sfc(urlJ$dbrows$WKT, EWKB = F)
+sdn <- st_sf(sfc, crs = 3011) %>%
+  rename(geometry = sfc) %>%
+  mutate(ADM_ID = as.integer(urlJ$dbrows$ID)) %>% 
+  arrange(ADM_ID)
+
+sdn$NAMN <-  urlJ2$dbrows$RESULT
+sdn <- sdn %>% dplyr::select(NAMN, ADM_ID)
+
+sdn <- sdn %>% mutate(ADM_ID = case_when(ADM_ID == 21 ~ 22, TRUE ~ as.numeric(ADM_ID)))
+
+#########################
 
 # Hämta alla Systembolagets butiker (API)
 systembolaget_url <- "https://api-extern.systembolaget.se/site/V2/Store"
@@ -57,13 +93,42 @@ table(sb_sthlm$Sdn_omarde)
 # Enkel plot
 plot(st_geometry(sb_sthlm))
 
-# Enkel, men interaktiv, kartvy
-tmap_mode("view")
-tm_shape(sb_sthlm) + tm_symbols(col = "ordersToday", style = "jenks")
+# Statisk kartvy
+# Ange tmap_mode("view")för interaktiv webbkarta 
+tmap_mode("plot")
+
+t <- tm_shape(sdn) + 
+  tm_borders(alpha = 0) +
+  tm_shape(sb_sthlm) + 
+  tm_symbols(
+    col = "ordersToday", 
+    size = "ordersToday",
+    style = "jenks", 
+    palette = "viridis") +
+  tm_shape(sdn) + 
+  tm_borders(lwd = 3) +
+  tm_shape(sdn) + 
+  tm_text(
+    "NAMN",
+    size = 0.5,
+    auto.placement = TRUE,
+    remove.overlap = TRUE,
+    col = "black") +
+  tm_credits("Datakällor: Systembolaget, Stockholms stad",
+             position=c("right", "bottom")) +
+  tm_scale_bar(position=c("left", "bottom")) +
+  tm_compass(type = "arrow", position=c("right", "top"), show.labels = 3) +
+  tm_layout(
+    main.title = "Systembolagsbutiker i Stockholms stad",
+    legend.format=list(fun=function(x) formatC(x, digits=0, format="d", big.mark = " "), text.separator = "-")
+  )
+
+tmap_save(t, "Systembolag.png", width = 297, height = 210, units = "mm", dpi = 300)
 
 # Transformera till SWEREF 99 18 00 TM
 sb_sthlm <- sb_sthlm %>% st_transform(., crs = 3011)
 
+# Spara geodata som ESRI Shape-filer
 st_write(sb_sthlm, "data/systembolag.shp", delete_dsn = T)
 
 ############################## Open Street Map (OSM) ##############################
