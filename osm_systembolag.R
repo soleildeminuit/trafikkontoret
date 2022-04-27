@@ -6,11 +6,12 @@ library(osmdata)
 library(sf)
 library(tmap)
 
-############################## Open Street Map (OSM) ##############################
+################################## Systembolaget ##################################
 # Hämta alla systembolag inom Stockholms stads gränser från Systembolaget         #
 #                                                                                 #
-# OBS! API-nyckel måste först skapas på https://api-portal.systembolaget.se/ och  #
-# läggas i textfilen "api_key_systembolaget.R" (i arbetskatalogen/working dir).   #
+# OBS! API-nyckel måste först skapas på:                                          #
+# https://api-portal.systembolaget.se/products/Open%20API                         #
+# Nyckeln läggs i textfilen "api_key_systembolaget.R" (i working dir).            #
 #                                                                                 #
 # Textfilen ska bara innehålla en enda rad:                                       #
 # api_key <- "<DIN API_NYCKEL>" + Enter                                           #
