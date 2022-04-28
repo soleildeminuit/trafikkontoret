@@ -17,6 +17,12 @@ for (package in c(
   }
 }
 
+# Installera alla nödvändiga paket, metod 2
+# list.of.packages <- c("ggplot2", "ggmap", "osmdata")
+# new.packages <- list.of.packages[!(list.of.packages %in% 
+#                                      installed.packages()[,"Package"])]
+# if(length(new.packages)) install.packages(new.packages)
+
 ################################## Systembolaget ##################################
 # Hämta alla systembolag inom Stockholms stads gränser från Systembolaget         #
 #                                                                                 #
